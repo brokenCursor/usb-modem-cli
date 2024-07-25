@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
-	
-	"github.com/brokenCursor/zte-modem-cli/drivers"
-	
+
+	"github.com/brokenCursor/usb-modem-cli/drivers"
+
 	"github.com/alexflint/go-arg"
 	"github.com/go-playground/validator/v10"
 )
@@ -37,10 +37,24 @@ func init() {
 
 func main() {
 	parser := arg.MustParse(&args)
+	model := "8810FT"
+	
+	modem, err := drivers.GetModemDriver(model, "192.168.0.1")
+	if err != nil {
+		panic("failed to get drivers")
+	}
 
 	switch {
 	case args.Connection != nil:
 		err := validate.Struct(args.Connection)
+		
+		cell, ok := modem.(drivers.ModemCell)
+		if !ok {
+			fmt.Printf("Modem %s does not support cell connection", modem.GetModel())
+			return
+		}
+
+		err, err := cell.GetCellConnStatus()
 
 		if err != nil {
 			parser.FailSubcommand("Unknown action", "conn")
@@ -49,8 +63,6 @@ func main() {
 	case parser.Subcommand() == nil:
 		parser.Fail("Missing or unknown command")
 	}
-	
-	GetModemDriver()
 
 	fmt.Printf("Modem cmd: %s\n", args.Ip)
 }

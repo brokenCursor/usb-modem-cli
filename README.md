@@ -1,2 +1,2 @@
-# zte-modem-cli
-CLI tool for managing ZTE USB modems
+# usb-modem-cli
+CLI tool for managing USB modems with HTTP API

@@ -11,7 +11,7 @@ type BaseModem interface {
 type ModemCell interface {
 	BaseModem
 
-	GetCellConnStatus() error
+	GetCellConnStatus() (bool, error)
 	ConnectCell() error
 	DisconnectCell() error
 }
@@ -28,7 +28,7 @@ type ModemSMS interface {
 	GetAllSMS() ([]SMS, error)
 }
 
-var models map[string]func(ip string) BaseModem
+var models map[string]func(ip string) BaseModem = map[string]func(ip string) BaseModem{}
 
 func isRegistered(name string) bool {
 	// Check if model has already been registered
@@ -39,7 +39,7 @@ func isRegistered(name string) bool {
 func registerModel(name string, generator func(ip string) BaseModem) {
 	// Check if model has already been registered
 	if isRegistered(name) {
-		panic(fmt.Sprintf("Attempted to register %s twice", name))
+		panic(fmt.Sprintf("attempted to register %s twice", name))
 	}
 
 	// Register the model
