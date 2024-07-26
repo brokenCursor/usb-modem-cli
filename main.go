@@ -14,7 +14,7 @@ import (
 
 type SMSArgs struct {
 	Action      string `arg:""`
-	PhoneNumber string `arg:"-n" help:"Recievers"`
+	PhoneNumber string `arg:"-n" help:"Receiver's phone number"`
 	Message     string `arg:"-m"`
 }
 
@@ -66,7 +66,7 @@ func run() error {
 
 			if err != nil {
 				fmt.Println("Failed to get connection status")
-				return 
+				return
 			}
 			if isConnected {
 				fmt.Println("Status: up")

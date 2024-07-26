@@ -28,22 +28,22 @@ type ModemSMS interface {
 	GetAllSMS() ([]SMS, error)
 }
 
-var models map[string]func(ip string) BaseModem = map[string]func(ip string) BaseModem{}
+var drivers map[string]func(ip string) BaseModem = map[string]func(ip string) BaseModem{}
 
 func isRegistered(name string) bool {
-	// Check if model has already been registered
-	_, ok := models[name]
+	// Check if driver has already been registered
+	_, ok := drivers[name]
 	return ok
 }
 
-func registerModel(name string, generator func(ip string) BaseModem) {
-	// Check if model has already been registered
+func registerDriver(name string, generator func(ip string) BaseModem) {
+	// Check if driver has already been registered
 	if isRegistered(name) {
 		panic(fmt.Sprintf("attempted to register %s twice", name))
 	}
 
-	// Register the model
-	models[name] = generator
+	// Register the driver
+	drivers[name] = generator
 }
 
 func GetModemDriver(model string, ip string) (BaseModem, error) {
@@ -51,9 +51,17 @@ func GetModemDriver(model string, ip string) (BaseModem, error) {
 		return nil, ErrUnknownModel
 	}
 
-	return models[model](ip), nil
+	return drivers[model](ip), nil
 }
 
 func GetAvailableDrivers() *[]string {
-	return nil
+	keys := make([]string, len(drivers))
+
+	i := 0
+	for k := range drivers {
+		keys[i] = k
+		i++
+	}
+
+	return &keys
 }
