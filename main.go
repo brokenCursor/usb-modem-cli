@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/brokenCursor/usb-modem-cli/drivers"
 
@@ -36,9 +37,15 @@ func init() {
 }
 
 func main() {
+	if err := run(); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+	}
+}
+
+func run() error {
 	parser := arg.MustParse(&args)
 	model := "8810FT"
-	
+
 	modem, err := drivers.GetModemDriver(model, "192.168.0.1")
 	if err != nil {
 		panic("failed to get drivers")
@@ -47,14 +54,26 @@ func main() {
 	switch {
 	case args.Connection != nil:
 		err := validate.Struct(args.Connection)
-		
+
 		cell, ok := modem.(drivers.ModemCell)
 		if !ok {
-			fmt.Printf("Modem %s does not support cell connection", modem.GetModel())
-			return
+			return DriverSupportError{Driver: modem, Function: "cell connection"}
 		}
 
-		err, err := cell.GetCellConnStatus()
+		switch args.Connection.Action {
+		case "status":
+			isConnected, err := cell.GetCellConnStatus()
+
+			if err != nil {
+				fmt.Println("Failed to get connection status")
+				return 
+			}
+			if isConnected {
+				fmt.Println("Status: up")
+			} else {
+				fmt.Println("Status: down")
+			}
+		}
 
 		if err != nil {
 			parser.FailSubcommand("Unknown action", "conn")
@@ -65,4 +84,6 @@ func main() {
 	}
 
 	fmt.Printf("Modem cmd: %s\n", args.Ip)
+
+	return nil
 }
