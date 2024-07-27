@@ -2,31 +2,37 @@ package drivers
 
 import "fmt"
 
-type BaseModem interface {
-	SetTargetIP(ip string) error
-	GetTargetIP() string
-	GetModel() string
-}
+// Modem interfaces
 
-type ModemCell interface {
-	BaseModem
+type (
+	BaseModem interface {
+		SetTargetIP(ip string) error
+		GetTargetIP() string
+		GetModel() string
+	}
 
-	GetCellConnStatus() (bool, error)
-	ConnectCell() error
-	DisconnectCell() error
-}
+	ModemCell interface {
+		BaseModem
 
-type SMS struct {
-	Sender  string
-	Message string
-}
+		GetCellConnStatus() (bool, error)
+		ConnectCell() error
+		DisconnectCell() error
+	}
 
-type ModemSMS interface {
-	BaseModem
+	ModemSMS interface {
+		BaseModem
 
-	SendSMS(phone string, message string) error
-	GetAllSMS() ([]SMS, error)
-}
+		SendSMS(phone string, message string) error
+		GetAllSMS() ([]SMS, error)
+	}
+)
+
+type (
+	SMS struct {
+		Sender  string
+		Message string
+	}
+)
 
 var drivers map[string]func(ip string) BaseModem = map[string]func(ip string) BaseModem{}
 

@@ -11,10 +11,6 @@ type DriverSupportError struct {
 	Function string
 }
 
-// func (e DriverSupportError) Unwrap() error {
-// 	return e.Err
-// }
-
 func (e DriverSupportError) Error() string {
 	return fmt.Sprintf("driver \"%s\" does not support %s", e.Driver.GetModel(), e.Function)
 }

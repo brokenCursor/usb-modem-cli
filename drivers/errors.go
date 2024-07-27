@@ -7,6 +7,7 @@ import (
 
 // Basic Errors
 var ErrUnknownModel = errors.New("attempting to get unknown model")
+var ErrNoDrivers = errors.New("no drivers were registered")
 var ErrUnknown = errors.New("unknown error")
 
 // Complex Errors
