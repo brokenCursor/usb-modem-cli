@@ -42,14 +42,14 @@ func (m *zte8810ft) getBaseURL(path string) *url.URL {
 	return &url.URL{Scheme: "http", Host: m.ip, Path: path}
 }
 
-func (m *zte8810ft) getNewRequest(method string, url *url.URL) *http.Request {
+func (m *zte8810ft) getNewRequest(method string, url *url.URL, headers ...http.Header) *http.Request {
 	return &http.Request{
 		Proto:  "HTTP/1.1",
 		Method: method,
 		URL:    url,
 		Header: http.Header{
 			"Referer": {fmt.Sprintf("http://%s/index.html", m.ip)},
-			"Content"
+			// "Content"
 		},
 	}
 }
@@ -219,11 +219,11 @@ func (m *zte8810ft) SendSMS(phone string, message string) error {
 	query.Add("MessageBody", "0074006500730074")
 
 	// Build send timestamp
-	currTime := time.Now()
-	if _, tz := currTime.Zone(); tz >= 0 {
-		query.Add("sms_time", currTime.Format("06;01;02;15;04;05;+")+strconv.Itoa(tz/3600))
+	t := time.Now()
+	if _, tz := t.Zone(); tz >= 0 {
+		query.Add("sms_time", t.Format("06;01;02;15;04;05;+")+strconv.Itoa(tz/3600))
 	} else {
-		query.Add("sms_time", currTime.Format("06;01;02;15;04;05;")+strconv.Itoa(tz/3600))
+		query.Add("sms_time", t.Format("06;01;02;15;04;05;")+strconv.Itoa(tz/3600))
 	}
 
 	// data := map[string]string{
@@ -243,7 +243,7 @@ func (m *zte8810ft) SendSMS(phone string, message string) error {
 	stringReader := strings.NewReader("goformId=SEND_SMS&Number=%2B79124446729&sms_time=24%3B07%3B28%3B19%3B01%3B24%3B%2B4&MessageBody=0074006500730074&ID=-1&encode_type=GSM7_default")
 	stringReadCloser := io.NopCloser(stringReader)
 	request.Body = stringReadCloser
-	
+	request.Header.Add("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
 
 	resp, err := httpClient.Do(request)
 
