@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -29,7 +30,7 @@ type (
 var httpClient *http.Client
 
 func init() {
-	httpClient = &http.Client{Timeout: time.Second * 10}
+	httpClient = &http.Client{Timeout: time.Second * 30}
 	registerDriver("ZTE 8810FT", newZTE8810FT)
 }
 
@@ -48,6 +49,7 @@ func (m *zte8810ft) getNewRequest(method string, url *url.URL) *http.Request {
 		URL:    url,
 		Header: http.Header{
 			"Referer": {fmt.Sprintf("http://%s/index.html", m.ip)},
+			"Content"
 		},
 	}
 }
@@ -193,4 +195,81 @@ func (m *zte8810ft) GetCellConnStatus() (*LinkStatus, error) {
 		// Unknown link status occurred
 		return nil, ErrUnknown
 	}
+}
+
+func (m *zte8810ft) SendSMS(phone string, message string) error {
+	// GET /goform/goform_set_cmd_process?goformId=SEND_SMS
+	// Prepare everything to make a request
+
+	// Encode message into GSM-7
+	// encodedMsg, err := gsm7.Encode([]byte(message))
+	// if err != nil {
+	// 	return ActionError{"sms send", err}
+	// }
+
+	u := m.getBaseURL("/goform/goform_set_cmd_process")
+
+	// Build body
+	query := u.Query()
+	query.Add("goformId", "SEND_SMS")
+	query.Add("ID", "-1")
+	query.Add("encode_type", "GSM7_default")
+	query.Add("Number", phone)
+	// query.Add("MessageBody", fmt.Sprintf("%X", encodedMsg))
+	query.Add("MessageBody", "0074006500730074")
+
+	// Build send timestamp
+	currTime := time.Now()
+	if _, tz := currTime.Zone(); tz >= 0 {
+		query.Add("sms_time", currTime.Format("06;01;02;15;04;05;+")+strconv.Itoa(tz/3600))
+	} else {
+		query.Add("sms_time", currTime.Format("06;01;02;15;04;05;")+strconv.Itoa(tz/3600))
+	}
+
+	// data := map[string]string{
+	// 	"goformId":    "SEND_SMS",
+	// 	"Number":      phone,
+	// 	"sms_time":    time.Now().Format("02;01;06;15;04;05;-07"),
+	// 	"MessageBody": string(encodedMsg),
+	// 	"ID":          "-1",
+	// 	"encode_type": "GSM7_default",
+	// }
+
+	request := m.getNewRequest("POST", u)
+
+	// Some Go-level string manipulation
+	fmt.Println(query.Encode())
+	// stringReader := strings.NewReader(query.Encode())
+	stringReader := strings.NewReader("goformId=SEND_SMS&Number=%2B79124446729&sms_time=24%3B07%3B28%3B19%3B01%3B24%3B%2B4&MessageBody=0074006500730074&ID=-1&encode_type=GSM7_default")
+	stringReadCloser := io.NopCloser(stringReader)
+	request.Body = stringReadCloser
+	
+
+	resp, err := httpClient.Do(request)
+
+	// Process errors
+	switch {
+	case err != nil:
+		return ActionError{Action: "sms send", Err: err}
+	case resp.StatusCode != 200:
+		return ActionError{Action: "sms send", Err: fmt.Errorf("response status %d", resp.StatusCode)}
+	}
+
+	// Read the response
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return ErrUnknown
+	}
+
+	result := new(result)
+	if err := json.Unmarshal(body, result); err != nil {
+		return ActionError{Action: "sms send", Err: UnmarshalError{RawData: &body, Err: err}}
+	}
+
+	if result.Result != "success" {
+		return ActionError{Action: "sms send", Err: fmt.Errorf("result: %s", result.Result)}
+	}
+
+	return nil
 }

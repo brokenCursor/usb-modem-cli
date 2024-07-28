@@ -23,7 +23,7 @@ type (
 		BaseModem
 
 		SendSMS(phone string, message string) error
-		GetAllSMS() ([]SMS, error)
+		// GetAllSMS() ([]SMS, error)
 	}
 )
 

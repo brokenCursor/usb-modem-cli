@@ -135,7 +135,11 @@ func run() error {
 			if err != nil {
 				parser.FailSubcommand("Unknown action", "sms")
 			}
-			sms.SendSMS(args.SMS.Send.PhoneNumber, args.SMS.Send.PhoneNumber)
+
+			err = sms.SendSMS(args.SMS.Send.PhoneNumber, args.SMS.Send.PhoneNumber)
+			if err != nil {
+				return err
+			}
 		}
 	case parser.Subcommand() == nil:
 		parser.Fail("Missing or unknown command")
