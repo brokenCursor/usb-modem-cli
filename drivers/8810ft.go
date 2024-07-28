@@ -22,7 +22,7 @@ type (
 	}
 
 	pppConnected struct {
-		Connected string `json:"ppp_connected"`
+		Connected string `json:"ppp_status"`
 	}
 )
 
@@ -38,7 +38,7 @@ func newZTE8810FT(ip string) BaseModem {
 }
 
 func (m *zte8810ft) getBaseURL(path string) *url.URL {
-	return &url.URL{Scheme: "https", Host: m.ip, Path: path}
+	return &url.URL{Scheme: "http", Host: m.ip, Path: path}
 }
 
 func (m *zte8810ft) getNewRequest(method string, url *url.URL) *http.Request {
@@ -113,7 +113,6 @@ func (m *zte8810ft) DisconnectCell() error {
 	request := m.getNewRequest("GET", u)
 
 	resp, err := httpClient.Do(request)
-
 	// Process errors
 	switch {
 	case err != nil:
@@ -141,7 +140,7 @@ func (m *zte8810ft) DisconnectCell() error {
 	return nil
 }
 
-func (m *zte8810ft) GetCellConnStatus() (bool, error) {
+func (m *zte8810ft) GetCellConnStatus() (*LinkStatus, error) {
 	// Lines 251-258
 	// /goform/goform_get_cmd_process?isTest=False&cmd=ppp_connected,multi_data=1&sms_received_flag_flag=0&sts_received_flag_flag=0&_=<curr_time>
 
@@ -149,41 +148,49 @@ func (m *zte8810ft) GetCellConnStatus() (bool, error) {
 	u := m.getBaseURL("/goform/goform_get_cmd_process")
 	query := u.Query()
 	query.Add("isTest", "False")
-	query.Add("cmd", "ppp_connected")
+	query.Add("cmd", "ppp_status")
 	query.Add("multi_data", "1")
 	query.Add("sms_received_flag_flag", "0")
 	query.Add("sts_received_flag_flag", "0")
 	query.Add("_", strconv.FormatInt((time.Now().UnixMilli)(), 10))
 	u.RawQuery = query.Encode()
 
-	request := m.getNewRequest("POST", u)
+	request := m.getNewRequest("GET", u)
 
 	resp, err := httpClient.Do(request)
 
 	// Process errors
 	switch {
 	case err != nil:
-		return false, ActionError{Action: "status", Err: err}
+		return nil, ActionError{Action: "status", Err: err}
 	case resp.StatusCode != 200:
-		return false, ActionError{Action: "status", Err: fmt.Errorf("response status %d", resp.StatusCode)}
+		return nil, ActionError{Action: "status", Err: fmt.Errorf("response status %d", resp.StatusCode)}
 	}
 
 	// Read the response
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return false, ErrUnknown
+		return nil, ErrUnknown
 	}
 
 	result := new(pppConnected)
 	if err := json.Unmarshal(body, result); err != nil {
-		return false, ActionError{Action: "status", Err: UnmarshalError{RawData: &body, Err: err}}
+		return nil, ActionError{Action: "status", Err: UnmarshalError{RawData: &body, Err: err}}
 	}
 
 	// Process the result
-	if result.Connected != "ppp_connected" {
-		return false, nil
+	switch result.Connected {
+	case "ppp_connected":
+		return &LinkStatus{Up: true}, nil
+	case "ppp_connecting":
+		return &LinkStatus{Connecting: true}, nil
+	case "ppp_disconnecting":
+		return &LinkStatus{Disconnecting: true}, nil
+	case "ppp_disconnected":
+		return &LinkStatus{Down: true}, nil
+	default:
+		// Unknown link status occurred
+		return nil, ErrUnknown
 	}
-
-	return true, nil
 }

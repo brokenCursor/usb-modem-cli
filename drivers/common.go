@@ -14,7 +14,7 @@ type (
 	ModemCell interface {
 		BaseModem
 
-		GetCellConnStatus() (bool, error)
+		GetCellConnStatus() (*LinkStatus, error)
 		ConnectCell() error
 		DisconnectCell() error
 	}
@@ -31,6 +31,14 @@ type (
 	SMS struct {
 		Sender  string
 		Message string
+	}
+
+	// Link statuses
+	LinkStatus struct {
+		Up            bool
+		Down          bool
+		Connecting    bool
+		Disconnecting bool
 	}
 )
 

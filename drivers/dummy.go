@@ -1,7 +1,5 @@
 package drivers
 
-import "fmt"
-
 // DO NOT USE DIRECTLY
 type (
 	dummy struct {
@@ -14,7 +12,7 @@ func init() {
 }
 
 func newDummy(ip string) BaseModem {
-	fmt.Println("Dummy driver enabled!")
+	// fmt.Println("Dummy driver enabled!")
 	return &dummy{ip: ip}
 }
 

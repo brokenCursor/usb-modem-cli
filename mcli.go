@@ -7,6 +7,7 @@ import (
 	"github.com/alexflint/go-arg"
 	"github.com/brokenCursor/usb-modem-cli/drivers"
 	"github.com/go-playground/validator/v10"
+	"github.com/i582/cfmt/cmd/cfmt"
 	"github.com/spf13/viper"
 )
 
@@ -32,16 +33,20 @@ func init() {
 	config.SetConfigType("yaml")
 
 	sep := string(os.PathSeparator)
-	config.AddConfigPath(dir + sep + "modem-cli" + sep + "config.yaml")
+	config.AddConfigPath(dir + sep + "modem-cli")
 
 	config.SetDefault("modem.model", "dummy")
 	config.SetDefault("modem.ip", "127.0.0.1")
 
+	err = config.ReadInConfig()
+	if err != nil { // Handle errors reading the config file
+		panic(fmt.Errorf("fatal error config file: %w", err))
+	}
 }
 
 func main() {
 	if err := run(); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		cfmt.Fprintf(os.Stderr, "{{error:}}::red %v\n", err)
 	}
 }
 
@@ -54,14 +59,18 @@ func run() error {
 	model := modemConfig.GetString("model")
 	ip := modemConfig.GetString("ip")
 
-	// if args.Ip != "" {
-	// 	ip = args.Ip
-	// }
-
 	if err := validate.Struct(args); err != nil {
 		// TODO: add actual error output
-		fmt.Printf("%s\n%v\n", err.Error(), ip)
 		parser.Fail("invalid value for \"--ip\" ")
+	}
+
+	if args.DisableColor {
+		cfmt.DisableColors()
+	}
+
+	// If IP has been overridden
+	if len(args.Ip) > 0 {
+		ip = args.Ip
 	}
 
 	modem, err := drivers.GetModemDriver(model, ip)
@@ -82,40 +91,55 @@ func run() error {
 		}
 
 		switch args.Connection.Action {
+		case "up":
+			err := cell.ConnectCell()
+
+			if err != nil {
+				return err
+			}
+		case "down":
+			err := cell.DisconnectCell()
+
+			if err != nil {
+				return err
+			}
 		case "status":
-			isConnected, err := cell.GetCellConnStatus()
+			status, err := cell.GetCellConnStatus()
 
 			if err != nil {
 				return err
 			}
 
-			if isConnected {
-				fmt.Println("Status: up")
-			} else {
-				fmt.Println("Status: down")
+			// Process and output status
+			switch {
+			case status.Up:
+				cfmt.Println("Status: {{up}}::green|bold")
+			case status.Down:
+				cfmt.Println("Status: {{down}}::red|bold")
+			case status.Connecting:
+				cfmt.Println("Status: {{connecting}}::yellow|bold")
+			case status.Disconnecting:
+				cfmt.Println("Status: {{disconnecting}}::#FA8100|bold")
 			}
-			return nil
 		}
-	// case args.SMS != nil:
-	// 	// None of this is implemented :)
-	// 	sms, ok := modem.(drivers.ModemSMS)
-	// 	if !ok {
-	// 		return DriverSupportError{Driver: modem, Function: "SMS"}
-	// 	}
+	case args.SMS != nil:
+		// None of this is implemented :)
+		sms, ok := modem.(drivers.ModemSMS)
+		if !ok {
+			return DriverSupportError{Driver: modem, Function: "SMS"}
+		}
 
-	// 	switch {
-	// 	case args.SMS.Read != nil:
-	// 		err := validate.Struct(args.SMS.Send)
-	// 		if err != nil {
-	// 			parser.FailSubcommand("Unknown action", "sms")
-	// 		}
-	// 		sms.SendSMS(args.SMS.Send.PhoneNumber, args.SMS.Send.PhoneNumber)
-	// 	}
+		switch {
+		case args.SMS.Send != nil:
+			err := validate.Struct(args.SMS.Send)
+			if err != nil {
+				parser.FailSubcommand("Unknown action", "sms")
+			}
+			sms.SendSMS(args.SMS.Send.PhoneNumber, args.SMS.Send.PhoneNumber)
+		}
 	case parser.Subcommand() == nil:
 		parser.Fail("Missing or unknown command")
 	}
-
-	fmt.Printf("Modem cmd: %s\n", args.Ip)
 
 	return nil
 }
