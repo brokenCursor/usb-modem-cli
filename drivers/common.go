@@ -6,8 +6,8 @@ import "fmt"
 
 type (
 	BaseModem interface {
-		SetTargetIP(ip string) error
-		GetTargetIP() string
+		SetHost(host string) error
+		GetHost() string
 		GetModel() string
 	}
 
@@ -42,7 +42,7 @@ type (
 	}
 )
 
-var drivers map[string]func(ip string) BaseModem = map[string]func(ip string) BaseModem{}
+var drivers map[string]func(host string) BaseModem = map[string]func(host string) BaseModem{}
 
 func isRegistered(name string) bool {
 	// Check if driver has already been registered
@@ -60,12 +60,12 @@ func registerDriver(name string, generator func(ip string) BaseModem) {
 	drivers[name] = generator
 }
 
-func GetModemDriver(model string, ip string) (BaseModem, error) {
+func GetModemDriver(model string, host string) (BaseModem, error) {
 	if !isRegistered(model) {
 		return nil, ErrUnknownModel
 	}
 
-	return drivers[model](ip), nil
+	return drivers[model](host), nil
 }
 
 func GetAvailableDrivers() *[]string {

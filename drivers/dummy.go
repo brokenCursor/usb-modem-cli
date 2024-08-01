@@ -20,11 +20,11 @@ func (m *dummy) GetModel() string {
 	return "Dummy"
 }
 
-func (m *dummy) SetTargetIP(ip string) error {
+func (m *dummy) SetHost(ip string) error {
 	m.ip = ip
 	return nil
 }
 
-func (m *dummy) GetTargetIP() string {
+func (m *dummy) GetHost() string {
 	return m.ip
 }

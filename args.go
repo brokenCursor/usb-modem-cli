@@ -22,7 +22,7 @@ type (
 	BaseArgs struct {
 		Connection   *ConnectionArgs `validate:"-" arg:"subcommand:conn" help:"Manage cell connection"`
 		SMS          *SMSActionArgs  `validate:"-" arg:"subcommand:sms" help:"Manage SMS"`
-		Ip           string          `validate:"omitempty,ipv4" arg:"--ip" help:"Override IP in config file"`
+		Host         string          `validate:"omitempty,ipv4|hostname" arg:"--host" help:"Override hostname in config file"`
 		DisableColor bool            `arg:"-p,--plain" help:"Disable color for better software interaction"`
 	}
 )
