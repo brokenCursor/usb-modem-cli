@@ -1,22 +1,22 @@
 on:
-    release:
-      types: [created]
-  
+  release:
+    types: [created]
+
 permissions:
-      packages: write
-  
+  packages: write
+
 jobs:
-    releases-matrix:
-      name: Release Go Binary
-      runs-on: ubuntu-latest
-      strategy:
-        matrix:
-          goos: [linux, windows]
-          goarch: ["386", amd64, arm64]
-          exclude:
-            - goarch: arm64
-              goos: windows
-      steps:
+  releases-matrix:
+    name: Release Go Binary
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, windows]
+        goarch: ["386", amd64, arm64]
+        exclude:
+          - goarch: arm64
+            goos: windows
+    steps:
       - uses: actions/checkout@v4
       - uses: wangyoucao577/go-release-action@v1
         with:
