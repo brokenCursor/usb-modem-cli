@@ -9,12 +9,14 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/warthog618/sms/encoding/gsm7"
 )
 
 // DO NOT USE DIRECTLY
 type (
 	zte8810ft struct {
-		ip       string
+		host     string
 		basePath string
 	}
 
@@ -34,33 +36,32 @@ func init() {
 	registerDriver("ZTE 8810FT", newZTE8810FT)
 }
 
-func newZTE8810FT(ip string) BaseModem {
-	return &zte8810ft{ip: ip, basePath: "/goform/goform_set_cmd_process"}
+func newZTE8810FT(host string) BaseModem {
+	return &zte8810ft{host: host, basePath: "/goform/goform_set_cmd_process"}
 }
 
 func (m *zte8810ft) getBaseURL(path string) *url.URL {
-	return &url.URL{Scheme: "http", Host: m.ip, Path: path}
+	return &url.URL{Scheme: "http", Host: m.host, Path: path}
 }
 
-func (m *zte8810ft) getNewRequest(method string, url *url.URL) *http.Request {
+func (m *zte8810ft) getNewRequest(method string, url *url.URL, headers http.Header) *http.Request {
+	headers.Add("Referer", fmt.Sprintf("http://%s/index.html", m.host))
+
 	return &http.Request{
 		Proto:  "HTTP/1.1",
 		Method: method,
 		URL:    url,
-		Header: http.Header{
-			"Referer": {fmt.Sprintf("http://%s/index.html", m.ip)},
-			"Content"
-		},
+		Header: headers,
 	}
 }
 
-func (m *zte8810ft) SetTargetIP(ip string) error {
-	m.ip = ip
+func (m *zte8810ft) SetHost(ip string) error {
+	m.host = ip
 	return nil
 }
 
-func (m *zte8810ft) GetTargetIP() string {
-	return m.ip
+func (m *zte8810ft) GetHost() string {
+	return m.host
 }
 
 func (m *zte8810ft) GetModel() string {
@@ -74,7 +75,7 @@ func (m *zte8810ft) ConnectCell() error {
 	query := u.Query()
 	query.Add("goformId", "CONNECT_NETWORK")
 	u.RawQuery = query.Encode()
-	request := m.getNewRequest("GET", u)
+	request := m.getNewRequest("GET", u, http.Header{})
 
 	resp, err := httpClient.Do(request)
 
@@ -112,7 +113,7 @@ func (m *zte8810ft) DisconnectCell() error {
 	query := u.Query()
 	query.Add("goformId", "DISCONNECT_NETWORK")
 	u.RawQuery = query.Encode()
-	request := m.getNewRequest("GET", u)
+	request := m.getNewRequest("GET", u, http.Header{})
 
 	resp, err := httpClient.Do(request)
 	// Process errors
@@ -157,7 +158,7 @@ func (m *zte8810ft) GetCellConnStatus() (*LinkStatus, error) {
 	query.Add("_", strconv.FormatInt((time.Now().UnixMilli)(), 10))
 	u.RawQuery = query.Encode()
 
-	request := m.getNewRequest("GET", u)
+	request := m.getNewRequest("GET", u, http.Header{})
 
 	resp, err := httpClient.Do(request)
 
@@ -201,12 +202,20 @@ func (m *zte8810ft) SendSMS(phone string, message string) error {
 	// GET /goform/goform_set_cmd_process?goformId=SEND_SMS
 	// Prepare everything to make a request
 
-	// Encode message into GSM-7
-	// encodedMsg, err := gsm7.Encode([]byte(message))
-	// if err != nil {
-	// 	return ActionError{"sms send", err}
-	// }
+	// Encode message into GSM-7 as byte array
+	encodedMsg, err := gsm7.Encode([]byte(message))
+	switch err {
 
+	}
+	if err != nil {
+		return ActionError{"sms send", err}
+	}
+
+	// Format into proprietary two byte format: 1122 (0074)
+	formattedMsg := ""
+	for _, hex := range encodedMsg {
+		formattedMsg += fmt.Sprintf("00%X", hex)
+	}
 	u := m.getBaseURL("/goform/goform_set_cmd_process")
 
 	// Build body
@@ -215,35 +224,23 @@ func (m *zte8810ft) SendSMS(phone string, message string) error {
 	query.Add("ID", "-1")
 	query.Add("encode_type", "GSM7_default")
 	query.Add("Number", phone)
-	// query.Add("MessageBody", fmt.Sprintf("%X", encodedMsg))
-	query.Add("MessageBody", "0074006500730074")
+	query.Add("MessageBody", formattedMsg)
 
 	// Build send timestamp
-	currTime := time.Now()
-	if _, tz := currTime.Zone(); tz >= 0 {
-		query.Add("sms_time", currTime.Format("06;01;02;15;04;05;+")+strconv.Itoa(tz/3600))
+	t := time.Now()
+	if _, tz := t.Zone(); tz >= 0 {
+		query.Add("sms_time", t.Format("06;01;02;15;04;05;+")+strconv.Itoa(tz/3600))
 	} else {
-		query.Add("sms_time", currTime.Format("06;01;02;15;04;05;")+strconv.Itoa(tz/3600))
+		query.Add("sms_time", t.Format("06;01;02;15;04;05;")+strconv.Itoa(tz/3600))
 	}
 
-	// data := map[string]string{
-	// 	"goformId":    "SEND_SMS",
-	// 	"Number":      phone,
-	// 	"sms_time":    time.Now().Format("02;01;06;15;04;05;-07"),
-	// 	"MessageBody": string(encodedMsg),
-	// 	"ID":          "-1",
-	// 	"encode_type": "GSM7_default",
-	// }
-
-	request := m.getNewRequest("POST", u)
+	request := m.getNewRequest("POST", u, http.Header{
+		"Content-Type": {"application/x-www-form-urlencoded", "charset=UTF-8"}})
 
 	// Some Go-level string manipulation
-	fmt.Println(query.Encode())
-	// stringReader := strings.NewReader(query.Encode())
-	stringReader := strings.NewReader("goformId=SEND_SMS&Number=%2B79124446729&sms_time=24%3B07%3B28%3B19%3B01%3B24%3B%2B4&MessageBody=0074006500730074&ID=-1&encode_type=GSM7_default")
+	stringReader := strings.NewReader(query.Encode())
 	stringReadCloser := io.NopCloser(stringReader)
 	request.Body = stringReadCloser
-	
 
 	resp, err := httpClient.Do(request)
 

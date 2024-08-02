@@ -36,7 +36,7 @@ func init() {
 	config.AddConfigPath(dir + sep + "modem-cli")
 
 	config.SetDefault("modem.model", "dummy")
-	config.SetDefault("modem.ip", "127.0.0.1")
+	config.SetDefault("modem.host", "127.0.0.1")
 
 	err = config.ReadInConfig()
 	if err != nil { // Handle errors reading the config file
@@ -57,11 +57,11 @@ func run() error {
 	modemConfig := config.Sub("modem")
 
 	model := modemConfig.GetString("model")
-	ip := modemConfig.GetString("ip")
+	ip := modemConfig.GetString("host")
 
 	if err := validate.Struct(args); err != nil {
 		// TODO: add actual error output
-		parser.Fail("invalid value for \"--ip\" ")
+		parser.Fail("invalid value for \"--host\" ")
 	}
 
 	if args.DisableColor {
@@ -69,8 +69,8 @@ func run() error {
 	}
 
 	// If IP has been overridden
-	if len(args.Ip) > 0 {
-		ip = args.Ip
+	if len(args.Host) > 0 {
+		ip = args.Host
 	}
 
 	modem, err := drivers.GetModemDriver(model, ip)
@@ -136,7 +136,7 @@ func run() error {
 				parser.FailSubcommand("Unknown action", "sms")
 			}
 
-			err = sms.SendSMS(args.SMS.Send.PhoneNumber, args.SMS.Send.PhoneNumber)
+			err = sms.SendSMS(args.SMS.Send.PhoneNumber, args.SMS.Send.Message)
 			if err != nil {
 				return err
 			}
