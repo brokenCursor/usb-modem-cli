@@ -3,7 +3,6 @@ on:
       types: [created]
   
 permissions:
-      contents: write
       packages: write
   
 jobs:
@@ -25,4 +24,3 @@ jobs:
           goos: ${{ matrix.goos }}
           goarch: ${{ matrix.goarch }}
           binary_name: "mcli"
-          extra_files: LICENSE README.md
