@@ -23,6 +23,6 @@ type (
 		Connection   *ConnectionArgs `validate:"-" arg:"subcommand:conn" help:"Manage cell connection"`
 		SMS          *SMSActionArgs  `validate:"-" arg:"subcommand:sms" help:"Manage SMS"`
 		Host         string          `validate:"omitempty,ipv4|hostname" arg:"--host" help:"Override hostname in config file"`
-		DisableColor bool            `arg:"-p,--plain" help:"Disable color for better software interaction"`
+		DisableColor bool            `arg:"--plain" help:"Disable color for better software interaction"`
 	}
 )
