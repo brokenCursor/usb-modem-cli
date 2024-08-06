@@ -1,47 +1,27 @@
 package main
 
 import (
-	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/alexflint/go-arg"
+	"github.com/brokenCursor/usb-modem-cli/config"
 	"github.com/brokenCursor/usb-modem-cli/drivers"
+	"github.com/brokenCursor/usb-modem-cli/logging"
 	"github.com/go-playground/validator/v10"
 	"github.com/i582/cfmt/cmd/cfmt"
-	"github.com/spf13/viper"
 )
 
 var (
 	validate *validator.Validate
 	args     BaseArgs
-	config   *viper.Viper
+	logger   *slog.Logger
 )
 
 func init() {
 	// Create a single instance of validator
 	validate = validator.New(validator.WithRequiredStructEnabled())
-
-	// Get config path
-	dir, err := os.UserConfigDir()
-	if err != nil {
-		panic("failed to get user config dir")
-	}
-
-	// Setup configuration
-	config = viper.New()
-	config.SetConfigName("config")
-	config.SetConfigType("yaml")
-
-	sep := string(os.PathSeparator)
-	config.AddConfigPath(dir + sep + "modem-cli")
-
-	config.SetDefault("modem.model", "dummy")
-	config.SetDefault("modem.host", "127.0.0.1")
-
-	err = config.ReadInConfig()
-	if err != nil { // Handle errors reading the config file
-		panic(fmt.Errorf("fatal error config file: %w", err))
-	}
+	logger = logging.GetGeneralLogger()
 }
 
 func main() {
@@ -65,11 +45,13 @@ func run() error {
 	}
 
 	if args.DisableColor {
+		logger.Debug("Colored output disabled")
 		cfmt.DisableColors()
 	}
 
 	// If IP has been overridden
 	if len(args.Host) > 0 {
+		logger.Debug("IP has been overridden")
 		ip = args.Host
 	}
 
@@ -93,19 +75,16 @@ func run() error {
 		switch args.Connection.Action {
 		case "up":
 			err := cell.ConnectCell()
-
 			if err != nil {
 				return err
 			}
 		case "down":
 			err := cell.DisconnectCell()
-
 			if err != nil {
 				return err
 			}
 		case "status":
 			status, err := cell.GetCellConnStatus()
-
 			if err != nil {
 				return err
 			}

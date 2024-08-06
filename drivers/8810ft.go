@@ -4,12 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/brokenCursor/usb-modem-cli/logging"
 	"github.com/warthog618/sms/encoding/gsm7"
 )
 
@@ -29,11 +31,16 @@ type (
 	}
 )
 
-var httpClient *http.Client
+var (
+	httpClient *http.Client
+	l          *slog.Logger
+)
 
 func init() {
+	l = logging.GetDriverLogger("ZTE 8810FT")
 	httpClient = &http.Client{Timeout: time.Second * 30}
 	registerDriver("ZTE 8810FT", newZTE8810FT)
+	l.Debug("driver registered")
 }
 
 func newZTE8810FT(host string) BaseModem {

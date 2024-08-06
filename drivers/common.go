@@ -1,6 +1,11 @@
 package drivers
 
-import "fmt"
+import (
+	"fmt"
+	"log/slog"
+
+	"github.com/brokenCursor/usb-modem-cli/logging"
+)
 
 // Modem interfaces
 
@@ -42,7 +47,14 @@ type (
 	}
 )
 
-var drivers map[string]func(host string) BaseModem = map[string]func(host string) BaseModem{}
+var (
+	drivers map[string]func(host string) BaseModem = map[string]func(host string) BaseModem{}
+	logger  *slog.Logger
+)
+
+func init() {
+	logger = logging.GetGeneralLogger()
+}
 
 func isRegistered(name string) bool {
 	// Check if driver has already been registered
@@ -65,6 +77,7 @@ func GetModemDriver(model string, host string) (BaseModem, error) {
 		return nil, ErrUnknownModel
 	}
 
+	logger.Debug("driver instance created", "driver", model, "host", host)
 	return drivers[model](host), nil
 }
 
