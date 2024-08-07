@@ -3,17 +3,17 @@ package drivers
 // DO NOT USE DIRECTLY
 type (
 	dummy struct {
-		ip string
+		host string
 	}
 )
 
 func init() {
 	registerDriver("dummy", newDummy)
+	dLogger.With("driver", "dummy").Debug("dummy driver registered")
 }
 
-func newDummy(ip string) BaseModem {
-	// fmt.Println("Dummy driver enabled!")
-	return &dummy{ip: ip}
+func newDummy(host string) BaseModem {
+	return &dummy{host: host}
 }
 
 func (m *dummy) GetModel() string {
@@ -21,10 +21,10 @@ func (m *dummy) GetModel() string {
 }
 
 func (m *dummy) SetHost(ip string) error {
-	m.ip = ip
+	m.host = ip
 	return nil
 }
 
 func (m *dummy) GetHost() string {
-	return m.ip
+	return m.host
 }

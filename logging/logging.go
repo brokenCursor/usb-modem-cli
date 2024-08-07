@@ -65,5 +65,5 @@ func GetGeneralLogger() *slog.Logger {
 }
 
 func GetDriverLogger(name string) *slog.Logger {
-	return driver.With("driver", name)
+	return driver
 }
