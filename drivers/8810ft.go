@@ -29,11 +29,9 @@ type (
 	}
 )
 
-var httpClient *http.Client
-
 func init() {
-	httpClient = &http.Client{Timeout: time.Second * 30}
 	registerDriver("ZTE 8810FT", newZTE8810FT)
+	// dLogger.Debug("driver registered")
 }
 
 func newZTE8810FT(host string) BaseModem {
@@ -77,6 +75,8 @@ func (m *zte8810ft) ConnectCell() error {
 	u.RawQuery = query.Encode()
 	request := m.getNewRequest("GET", u, http.Header{})
 
+	dLogger.With("driver", "8810FT").Debug("request", request.URL.String(), nil)
+
 	resp, err := httpClient.Do(request)
 
 	// Process errors
@@ -115,6 +115,8 @@ func (m *zte8810ft) DisconnectCell() error {
 	u.RawQuery = query.Encode()
 	request := m.getNewRequest("GET", u, http.Header{})
 
+	dLogger.With("driver", "8810FT").Debug("request", request.URL.String(), nil)
+
 	resp, err := httpClient.Do(request)
 	// Process errors
 	switch {
@@ -144,9 +146,6 @@ func (m *zte8810ft) DisconnectCell() error {
 }
 
 func (m *zte8810ft) GetCellConnStatus() (*LinkStatus, error) {
-	// Lines 251-258
-	// /goform/goform_get_cmd_process?isTest=False&cmd=ppp_connected,multi_data=1&sms_received_flag_flag=0&sts_received_flag_flag=0&_=<curr_time>
-
 	// Build URL
 	u := m.getBaseURL("/goform/goform_get_cmd_process")
 	query := u.Query()
@@ -159,6 +158,8 @@ func (m *zte8810ft) GetCellConnStatus() (*LinkStatus, error) {
 	u.RawQuery = query.Encode()
 
 	request := m.getNewRequest("GET", u, http.Header{})
+
+	dLogger.With("driver", "8810FT").Debug("request", request.URL.String(), nil)
 
 	resp, err := httpClient.Do(request)
 
@@ -185,13 +186,13 @@ func (m *zte8810ft) GetCellConnStatus() (*LinkStatus, error) {
 	// Process the result
 	switch result.Connected {
 	case "ppp_connected":
-		return &LinkStatus{Up: true}, nil
+		return &LinkStatus{State: 3}, nil
 	case "ppp_connecting":
-		return &LinkStatus{Connecting: true}, nil
+		return &LinkStatus{State: 2}, nil
 	case "ppp_disconnecting":
-		return &LinkStatus{Disconnecting: true}, nil
+		return &LinkStatus{State: 1}, nil
 	case "ppp_disconnected":
-		return &LinkStatus{Down: true}, nil
+		return &LinkStatus{State: 0}, nil
 	default:
 		// Unknown link status occurred
 		return nil, ErrUnknown
@@ -238,9 +239,12 @@ func (m *zte8810ft) SendSMS(phone string, message string) error {
 		"Content-Type": {"application/x-www-form-urlencoded", "charset=UTF-8"}})
 
 	// Some Go-level string manipulation
-	stringReader := strings.NewReader(query.Encode())
+	encoded := query.Encode()
+	stringReader := strings.NewReader(encoded)
 	stringReadCloser := io.NopCloser(stringReader)
 	request.Body = stringReadCloser
+
+	dLogger.With("driver", "8810FT").Debug("url", request.URL.String(), "body", encoded, nil)
 
 	resp, err := httpClient.Do(request)
 

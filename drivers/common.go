@@ -1,6 +1,14 @@
 package drivers
 
-import "fmt"
+import (
+	"fmt"
+	"log/slog"
+	"net/http"
+	"time"
+
+	"github.com/brokenCursor/usb-modem-cli/config"
+	"github.com/brokenCursor/usb-modem-cli/logging"
+)
 
 // Modem interfaces
 
@@ -35,14 +43,27 @@ type (
 
 	// Link statuses
 	LinkStatus struct {
-		Up            bool
-		Down          bool
-		Connecting    bool
-		Disconnecting bool
+		State int8
 	}
 )
 
-var drivers map[string]func(host string) BaseModem = map[string]func(host string) BaseModem{}
+var (
+	drivers    map[string]func(host string) BaseModem = map[string]func(host string) BaseModem{}
+	httpClient *http.Client
+
+	logger  *slog.Logger
+	dLogger *slog.Logger
+)
+
+func init() {
+	logger = logging.GetGeneralLogger()
+	// TODO: fix per-driver logging while keeping the dependency three sane-ish
+	dLogger = logging.GetDriverLogger("common")
+
+	driverConfig := config.Sub("driver")
+	// logger.Debug("ttl", driverConfig.GetDuration("cmd_ttl")*time.Second)
+	httpClient = &http.Client{Timeout: driverConfig.GetDuration("cmd_ttl") * time.Second}
+}
 
 func isRegistered(name string) bool {
 	// Check if driver has already been registered
@@ -65,6 +86,7 @@ func GetModemDriver(model string, host string) (BaseModem, error) {
 		return nil, ErrUnknownModel
 	}
 
+	logger.Debug("driver instance created", "driver", model, "host", host)
 	return drivers[model](host), nil
 }
 
