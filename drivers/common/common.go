@@ -1,13 +1,12 @@
-package drivers
+package common
 
 import (
 	"fmt"
 	"log/slog"
-	"net/http"
-	"time"
 
 	"github.com/brokenCursor/usb-modem-cli/config"
 	"github.com/brokenCursor/usb-modem-cli/logging"
+	"github.com/spf13/viper"
 )
 
 // Modem interfaces
@@ -48,41 +47,37 @@ type (
 )
 
 var (
-	drivers    map[string]func(host string) BaseModem = map[string]func(host string) BaseModem{}
-	httpClient *http.Client
-
-	logger  *slog.Logger
-	dLogger *slog.Logger
+	drivers      map[string]func(host string) BaseModem = map[string]func(host string) BaseModem{}
+	driverConfig *viper.Viper
+	logger       *slog.Logger
 )
 
 func init() {
 	logger = logging.GetGeneralLogger()
-	// TODO: fix per-driver logging while keeping the dependency three sane-ish
-	dLogger = logging.GetDriverLogger("common")
-
-	driverConfig := config.Sub("driver")
-	// logger.Debug("ttl", driverConfig.GetDuration("cmd_ttl")*time.Second)
-	httpClient = &http.Client{Timeout: driverConfig.GetDuration("cmd_ttl") * time.Second}
+	driverConfig = config.Sub("driver")
 }
 
-func isRegistered(name string) bool {
+func IsRegistered(name string) bool {
 	// Check if driver has already been registered
 	_, ok := drivers[name]
 	return ok
 }
 
-func registerDriver(name string, generator func(ip string) BaseModem) {
+func RegisterDriver(name string, generator func(ip string) BaseModem) (*viper.Viper, *slog.Logger) {
 	// Check if driver has already been registered
-	if isRegistered(name) {
+	if IsRegistered(name) {
 		panic(fmt.Sprintf("attempted to register %s twice", name))
 	}
 
 	// Register the driver
 	drivers[name] = generator
+	logger.With("name", name).Debug("driver registered")
+
+	return driverConfig, logging.GetDriverLogger(name)
 }
 
 func GetModemDriver(model string, host string) (BaseModem, error) {
-	if !isRegistered(model) {
+	if !IsRegistered(model) {
 		return nil, ErrUnknownModel
 	}
 

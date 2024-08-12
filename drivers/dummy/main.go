@@ -1,4 +1,10 @@
-package drivers
+package dummy
+
+import (
+	"log/slog"
+
+	"github.com/brokenCursor/usb-modem-cli/drivers/common"
+)
 
 // DO NOT USE DIRECTLY
 type (
@@ -7,12 +13,16 @@ type (
 	}
 )
 
+var (
+	logger *slog.Logger
+)
+
 func init() {
-	registerDriver("dummy", newDummy)
-	dLogger.With("driver", "dummy").Debug("dummy driver registered")
+	_, logger = common.RegisterDriver("dummy", newDummy)
 }
 
-func newDummy(host string) BaseModem {
+func newDummy(host string) common.BaseModem {
+	logger.With("driver", "dummy").Debug("dummy driver registered")
 	return &dummy{host: host}
 }
 

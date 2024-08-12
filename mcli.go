@@ -6,7 +6,7 @@ import (
 
 	"github.com/alexflint/go-arg"
 	"github.com/brokenCursor/usb-modem-cli/config"
-	"github.com/brokenCursor/usb-modem-cli/drivers"
+	"github.com/brokenCursor/usb-modem-cli/drivers/common"
 	"github.com/brokenCursor/usb-modem-cli/logging"
 	"github.com/go-playground/validator/v10"
 	"github.com/i582/cfmt/cmd/cfmt"
@@ -18,13 +18,10 @@ var (
 	logger   *slog.Logger
 )
 
-func init() {
-	// Create a single instance of validator
+func main() {
 	validate = validator.New(validator.WithRequiredStructEnabled())
 	logger = logging.GetGeneralLogger()
-}
 
-func main() {
 	if err := run(); err != nil {
 		cfmt.Fprintf(os.Stderr, "{{error:}}::red %v\n", err)
 	}
@@ -55,7 +52,7 @@ func run() error {
 		ip = args.Host
 	}
 
-	modem, err := drivers.GetModemDriver(model, ip)
+	modem, err := common.GetModemDriver(model, ip)
 	if err != nil {
 		return err
 	}
@@ -67,7 +64,7 @@ func run() error {
 			parser.FailSubcommand("Unknown action", "conn")
 		}
 
-		cell, ok := modem.(drivers.ModemCell)
+		cell, ok := modem.(common.ModemCell)
 		if !ok {
 			return DriverSupportError{Driver: modem, Function: "cell connection"}
 		}
@@ -103,7 +100,7 @@ func run() error {
 		}
 	case args.SMS != nil:
 		// None of this is implemented :)
-		sms, ok := modem.(drivers.ModemSMS)
+		sms, ok := modem.(common.ModemSMS)
 		if !ok {
 			return DriverSupportError{Driver: modem, Function: "SMS"}
 		}
