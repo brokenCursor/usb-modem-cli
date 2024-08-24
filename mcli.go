@@ -6,7 +6,7 @@ import (
 
 	"github.com/alexflint/go-arg"
 	"github.com/brokenCursor/usb-modem-cli/config"
-	"github.com/brokenCursor/usb-modem-cli/drivers/common"
+	"github.com/brokenCursor/usb-modem-cli/drivers"
 	"github.com/brokenCursor/usb-modem-cli/logging"
 	"github.com/go-playground/validator/v10"
 	"github.com/i582/cfmt/cmd/cfmt"
@@ -34,7 +34,6 @@ func run() error {
 	modemConfig := config.Sub("modem")
 
 	model := modemConfig.GetString("model")
-	ip := modemConfig.GetString("host")
 
 	if err := validate.Struct(args); err != nil {
 		// TODO: add actual error output
@@ -49,10 +48,10 @@ func run() error {
 	// If IP has been overridden
 	if len(args.Host) > 0 {
 		logger.Debug("IP has been overridden")
-		ip = args.Host
+		modemConfig.Set("host", args.Host)
 	}
 
-	modem, err := common.GetModemDriver(model, ip)
+	modem, err := drivers.GetModemDriver(model, modemConfig, logging.GetDriverLogger(model))
 	if err != nil {
 		return err
 	}
@@ -64,7 +63,7 @@ func run() error {
 			parser.FailSubcommand("Unknown action", "conn")
 		}
 
-		cell, ok := modem.(common.ModemCell)
+		cell, ok := modem.(drivers.ModemCell)
 		if !ok {
 			return DriverSupportError{Driver: modem, Function: "cell connection"}
 		}
@@ -100,7 +99,7 @@ func run() error {
 		}
 	case args.SMS != nil:
 		// None of this is implemented :)
-		sms, ok := modem.(common.ModemSMS)
+		sms, ok := modem.(drivers.ModemSMS)
 		if !ok {
 			return DriverSupportError{Driver: modem, Function: "SMS"}
 		}

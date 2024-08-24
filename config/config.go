@@ -27,11 +27,10 @@ func init() {
 	// -- Defaults -- //
 	config.SetDefault("modem.model", "dummy")
 	config.SetDefault("modem.host", "127.0.0.1")
+	config.SetDefault("modem.cmd_ttl", 10)
 
 	config.SetDefault("logging.general", "error")
 	config.SetDefault("logging.driver", "error")
-
-	config.SetDefault("driver.cmd_ttl", 10)
 	// -- Defaults -- //
 
 	err = config.ReadInConfig()

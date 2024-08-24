@@ -1,4 +1,4 @@
-package zte8810ft
+package drivers
 
 import (
 	"encoding/json"
@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/brokenCursor/usb-modem-cli/drivers/common"
+	cfg "github.com/brokenCursor/usb-modem-cli/config"
 	"github.com/spf13/viper"
 	"github.com/warthog618/sms/encoding/gsm7"
 )
@@ -19,8 +19,9 @@ import (
 // DO NOT USE DIRECTLY
 type (
 	zte8810ft struct {
-		host     string
-		basePath string
+		httpClient *http.Client
+		logger     *slog.Logger
+		config     *viper.Viper
 	}
 
 	result struct {
@@ -32,31 +33,42 @@ type (
 	}
 )
 
-var (
-	httpClient *http.Client
-	logger     *slog.Logger
-	config     *viper.Viper
-)
-
 func init() {
 	fmt.Println("here")
-	config, logger = common.RegisterDriver("ZTE 8810FT", newZTE8810FT)
+	RegisterDriver("ZTE 8810FT", newZTE8810FT)
 }
 
-func newZTE8810FT(host string) common.BaseModem {
-	if httpClient == nil {
-		httpClient = &http.Client{Timeout: config.GetDuration("cmd_ttl") * time.Second}
+func newZTE8810FT(config *viper.Viper, logger *slog.Logger) (BaseModem, error) {
+	if config.IsSet("iface") {
+		ifaceName := config.GetString("iface")
+		logger.With("iface_name", ifaceName).Debug("interface has been specified")
+
+		// Get this computer's IP on the interface
+		ifaceAddr, err := GetInterfaceIPv4Addr(ifaceName)
+		if err != nil {
+			return nil, cfg.ConfigError{Key: "iface", Value: ifaceName, Err: cfg.ErrInvalidValue}
+		}
+		logger.With("source_ip", ifaceAddr).Debug("request source ip addr")
+
+		// Create a transport which for the specified interface
+		transport, err := GetTransportForIPv4(ifaceAddr)
+		if err != nil {
+			return nil, err
+		}
+
+		return &zte8810ft{logger: logger.With("modem", "ZTE8810FT"), config: config, httpClient: &http.Client{Transport: transport}}, nil
+	} else {
+		return &zte8810ft{logger: logger.With("modem", "ZTE8810FT"), config: config, httpClient: &http.Client{}}, nil
 	}
 
-	return &zte8810ft{host: host, basePath: "/goform/goform_set_cmd_process"}
 }
 
 func (m *zte8810ft) getBaseURL(path string) *url.URL {
-	return &url.URL{Scheme: "http", Host: m.host, Path: path}
+	return &url.URL{Scheme: "http", Host: m.config.GetString("host"), Path: path}
 }
 
 func (m *zte8810ft) getNewRequest(method string, url *url.URL, headers http.Header) *http.Request {
-	headers.Add("Referer", fmt.Sprintf("http://%s/index.html", m.host))
+	headers.Add("Referer", fmt.Sprintf("http://%s/index.html", m.config.GetString("host")))
 
 	return &http.Request{
 		Proto:  "HTTP/1.1",
@@ -66,21 +78,11 @@ func (m *zte8810ft) getNewRequest(method string, url *url.URL, headers http.Head
 	}
 }
 
-func (m *zte8810ft) SetHost(host string) error {
-	m.host = host
-	return nil
-}
-
-func (m *zte8810ft) GetHost() string {
-	return m.host
-}
-
 func (m *zte8810ft) GetModel() string {
 	return "ZTE 8810FT"
 }
 
 func (m *zte8810ft) ConnectCell() error {
-	// 	GET /goform/goform_set_cmd_process?goformId=CONNECT_NETWORK
 	// Prepare everything to make a request
 	u := m.getBaseURL("/goform/goform_set_cmd_process")
 	query := u.Query()
@@ -88,32 +90,32 @@ func (m *zte8810ft) ConnectCell() error {
 	u.RawQuery = query.Encode()
 	request := m.getNewRequest("GET", u, http.Header{})
 
-	logger.Debug("request", request.URL.String(), nil)
+	m.logger.Debug("request", request.URL.String(), nil)
 
-	resp, err := httpClient.Do(request)
+	resp, err := m.httpClient.Do(request)
 
 	// Process errors
 	switch {
 	case err != nil:
-		return common.ActionError{Action: "connect", Err: err}
+		return ActionError{Action: "connect", Err: err}
 	case resp.StatusCode != 200:
-		return common.ActionError{Action: "connect", Err: fmt.Errorf("response status %d", resp.StatusCode)}
+		return ActionError{Action: "connect", Err: fmt.Errorf("response status %d", resp.StatusCode)}
 	}
 
 	// Read the response
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return common.ErrUnknown
+		return ErrUnknown
 	}
 
 	result := new(result)
 	if err := json.Unmarshal(body, result); err != nil {
-		return common.ActionError{Action: "connect", Err: common.UnmarshalError{RawData: &body, Err: err}}
+		return ActionError{Action: "connect", Err: UnmarshalError{RawData: &body, Err: err}}
 	}
 
 	if result.Result != "success" {
-		return common.ActionError{Action: "connect", Err: fmt.Errorf("result: %s", result.Result)}
+		return ActionError{Action: "connect", Err: fmt.Errorf("result: %s", result.Result)}
 	}
 
 	return nil
@@ -128,37 +130,37 @@ func (m *zte8810ft) DisconnectCell() error {
 	u.RawQuery = query.Encode()
 	request := m.getNewRequest("GET", u, http.Header{})
 
-	logger.Debug("request", request.URL.String(), nil)
+	m.logger.Debug("request", request.URL.String(), nil)
 
-	resp, err := httpClient.Do(request)
+	resp, err := m.httpClient.Do(request)
 	// Process errors
 	switch {
 	case err != nil:
-		return common.ActionError{Action: "disconnect", Err: err}
+		return ActionError{Action: "disconnect", Err: err}
 	case resp.StatusCode != 200:
-		return common.ActionError{Action: "disconnect", Err: fmt.Errorf("response status %d", resp.StatusCode)}
+		return ActionError{Action: "disconnect", Err: fmt.Errorf("response status %d", resp.StatusCode)}
 	}
 
 	// Read the response
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return common.ErrUnknown
+		return ErrUnknown
 	}
 
 	result := new(result)
 	if err := json.Unmarshal(body, result); err != nil {
-		return common.ActionError{Action: "disconnect", Err: common.UnmarshalError{RawData: &body, Err: err}}
+		return ActionError{Action: "disconnect", Err: UnmarshalError{RawData: &body, Err: err}}
 	}
 
 	if result.Result != "success" {
-		return common.ActionError{Action: "disconnect", Err: fmt.Errorf("result: %s", result.Result)}
+		return ActionError{Action: "disconnect", Err: fmt.Errorf("result: %s", result.Result)}
 	}
 
 	return nil
 }
 
-func (m *zte8810ft) GetCellConnStatus() (*common.LinkStatus, error) {
+func (m *zte8810ft) GetCellConnStatus() (*LinkStatus, error) {
 	// Build URL
 	u := m.getBaseURL("/goform/goform_get_cmd_process")
 	query := u.Query()
@@ -172,43 +174,43 @@ func (m *zte8810ft) GetCellConnStatus() (*common.LinkStatus, error) {
 
 	request := m.getNewRequest("GET", u, http.Header{})
 
-	logger.Debug("request", request.URL.String(), nil)
+	m.logger.Debug("request", request.URL.String(), nil)
 
-	resp, err := httpClient.Do(request)
+	resp, err := m.httpClient.Do(request)
 
 	// Process errors
 	switch {
 	case err != nil:
-		return nil, common.ActionError{Action: "status", Err: err}
+		return nil, ActionError{Action: "status", Err: err}
 	case resp.StatusCode != 200:
-		return nil, common.ActionError{Action: "status", Err: fmt.Errorf("response status %d", resp.StatusCode)}
+		return nil, ActionError{Action: "status", Err: fmt.Errorf("response status %d", resp.StatusCode)}
 	}
 
 	// Read the response
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, common.ErrUnknown
+		return nil, ErrUnknown
 	}
 
 	result := new(pppConnected)
 	if err := json.Unmarshal(body, result); err != nil {
-		return nil, common.ActionError{Action: "status", Err: common.UnmarshalError{RawData: &body, Err: err}}
+		return nil, ActionError{Action: "status", Err: UnmarshalError{RawData: &body, Err: err}}
 	}
 
 	// Process the result
 	switch result.Connected {
 	case "ppp_connected":
-		return &common.LinkStatus{State: 3}, nil
+		return &LinkStatus{State: 3}, nil
 	case "ppp_connecting":
-		return &common.LinkStatus{State: 2}, nil
+		return &LinkStatus{State: 2}, nil
 	case "ppp_disconnecting":
-		return &common.LinkStatus{State: 1}, nil
+		return &LinkStatus{State: 1}, nil
 	case "ppp_disconnected":
-		return &common.LinkStatus{State: 0}, nil
+		return &LinkStatus{State: 0}, nil
 	default:
 		// Unknown link status occurred
-		return nil, common.ErrUnknown
+		return nil, ErrUnknown
 	}
 }
 
@@ -222,7 +224,7 @@ func (m *zte8810ft) SendSMS(phone string, message string) error {
 
 	}
 	if err != nil {
-		return common.ActionError{"sms send", err}
+		return ActionError{Action: "sms send", Err: err}
 	}
 
 	// Format into proprietary two byte format: 1122 (0074)
@@ -257,32 +259,32 @@ func (m *zte8810ft) SendSMS(phone string, message string) error {
 	stringReadCloser := io.NopCloser(stringReader)
 	request.Body = stringReadCloser
 
-	logger.Debug("url", request.URL.String(), "body", encoded, nil)
+	m.logger.Debug("url", request.URL.String(), "body", encoded, nil)
 
-	resp, err := httpClient.Do(request)
+	resp, err := m.httpClient.Do(request)
 
 	// Process errors
 	switch {
 	case err != nil:
-		return common.ActionError{Action: "sms send", Err: err}
+		return ActionError{Action: "sms send", Err: err}
 	case resp.StatusCode != 200:
-		return common.ActionError{Action: "sms send", Err: fmt.Errorf("response status %d", resp.StatusCode)}
+		return ActionError{Action: "sms send", Err: fmt.Errorf("response status %d", resp.StatusCode)}
 	}
 
 	// Read the response
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return common.ErrUnknown
+		return ErrUnknown
 	}
 
 	result := new(result)
 	if err := json.Unmarshal(body, result); err != nil {
-		return common.ActionError{Action: "sms send", Err: common.UnmarshalError{RawData: &body, Err: err}}
+		return ActionError{Action: "sms send", Err: UnmarshalError{RawData: &body, Err: err}}
 	}
 
 	if result.Result != "success" {
-		return common.ActionError{Action: "sms send", Err: fmt.Errorf("result: %s", result.Result)}
+		return ActionError{Action: "sms send", Err: fmt.Errorf("result: %s", result.Result)}
 	}
 
 	return nil

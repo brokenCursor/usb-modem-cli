@@ -1,4 +1,4 @@
-package common
+package drivers
 
 import (
 	"errors"
@@ -24,6 +24,7 @@ func (e ActionError) Error() string {
 	return fmt.Sprintf("action error: %s failed with %e", e.Action, e.Err)
 }
 
+// -- //
 type UnmarshalError struct {
 	RawData *[]byte
 	Err     error

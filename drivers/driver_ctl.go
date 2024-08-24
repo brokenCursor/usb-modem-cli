@@ -1,10 +1,9 @@
-package common
+package drivers
 
 import (
 	"fmt"
 	"log/slog"
 
-	"github.com/brokenCursor/usb-modem-cli/config"
 	"github.com/brokenCursor/usb-modem-cli/logging"
 	"github.com/spf13/viper"
 )
@@ -13,8 +12,6 @@ import (
 
 type (
 	BaseModem interface {
-		SetHost(host string) error
-		GetHost() string
 		GetModel() string
 	}
 
@@ -47,49 +44,45 @@ type (
 )
 
 var (
-	drivers      map[string]func(host string) BaseModem = map[string]func(host string) BaseModem{}
-	driverConfig *viper.Viper
-	logger       *slog.Logger
+	Drivers map[string]func(config *viper.Viper, logger *slog.Logger) (BaseModem, error) = map[string]func(config *viper.Viper, logger *slog.Logger) (BaseModem, error){}
+	logger  *slog.Logger
 )
 
 func init() {
 	logger = logging.GetGeneralLogger()
-	driverConfig = config.Sub("driver")
 }
 
 func IsRegistered(name string) bool {
 	// Check if driver has already been registered
-	_, ok := drivers[name]
+	_, ok := Drivers[name]
 	return ok
 }
 
-func RegisterDriver(name string, generator func(ip string) BaseModem) (*viper.Viper, *slog.Logger) {
+func RegisterDriver(name string, generator func(config *viper.Viper, logger *slog.Logger) (BaseModem, error)) {
 	// Check if driver has already been registered
 	if IsRegistered(name) {
 		panic(fmt.Sprintf("attempted to register %s twice", name))
 	}
 
 	// Register the driver
-	drivers[name] = generator
+	Drivers[name] = generator
 	logger.With("name", name).Debug("driver registered")
-
-	return driverConfig, logging.GetDriverLogger(name)
 }
 
-func GetModemDriver(model string, host string) (BaseModem, error) {
+func GetModemDriver(model string, config *viper.Viper, logger *slog.Logger) (BaseModem, error) {
 	if !IsRegistered(model) {
 		return nil, ErrUnknownModel
 	}
 
-	logger.Debug("driver instance created", "driver", model, "host", host)
-	return drivers[model](host), nil
+	logger.Debug("driver instance created", "driver", model)
+	return Drivers[model](config, logger)
 }
 
 func GetAvailableDrivers() *[]string {
-	keys := make([]string, len(drivers))
+	keys := make([]string, len(Drivers))
 
 	i := 0
-	for k := range drivers {
+	for k := range Drivers {
 		keys[i] = k
 		i++
 	}

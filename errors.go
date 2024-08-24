@@ -3,11 +3,11 @@ package main
 import (
 	"fmt"
 
-	"github.com/brokenCursor/usb-modem-cli/drivers/common"
+	"github.com/brokenCursor/usb-modem-cli/drivers"
 )
 
 type DriverSupportError struct {
-	Driver   common.BaseModem
+	Driver   drivers.BaseModem
 	Function string
 }
 
