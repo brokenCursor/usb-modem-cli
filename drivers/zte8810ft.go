@@ -91,7 +91,7 @@ func (m *zte8810ft) ConnectCell() error {
 	u.RawQuery = query.Encode()
 
 	// Create request
-	request, err := m.getNewRequest("GET", u, http.Header{}, strings.NewReader(""))
+	request, err := m.getNewRequest("GET", u, http.Header{}, nil)
 	if err != nil {
 		return ActionError{Action: "connect", Err: err}
 	}
@@ -135,7 +135,7 @@ func (m *zte8810ft) DisconnectCell() error {
 	u.RawQuery = query.Encode()
 
 	// Create request
-	request, err := m.getNewRequest("GET", u, http.Header{}, strings.NewReader(""))
+	request, err := m.getNewRequest("GET", u, http.Header{}, nil)
 	if err != nil {
 		return ActionError{Action: "disconnect", Err: err}
 	}
@@ -182,7 +182,7 @@ func (m *zte8810ft) GetCellConnStatus() (*LinkStatus, error) {
 	query.Add("_", strconv.FormatInt((time.Now().UnixMilli)(), 10))
 	u.RawQuery = query.Encode()
 
-	request, err := m.getNewRequest("GET", u, http.Header{}, strings.NewReader(""))
+	request, err := m.getNewRequest("GET", u, http.Header{}, nil)
 	if err != nil {
 		return nil, ActionError{Action: "status", Err: err}
 	}
@@ -264,11 +264,12 @@ func (m *zte8810ft) SendSMS(phone string, message string) error {
 
 	// Some Go-level string manipulation
 	encoded := query.Encode()
-	stringReader := strings.NewReader(encoded)
+	queryReader := strings.NewReader(encoded)
 
 	// Create request
 	request, err := m.getNewRequest("POST", u, http.Header{
-		"Content-Type": {"application/x-www-form-urlencoded; charset=UTF-8"}}, stringReader)
+		"Content-Type": {"application/x-www-form-urlencoded; charset=UTF-8"}}, queryReader)
+
 	if err != nil {
 		return ActionError{Action: "sms send", Err: err}
 	}
