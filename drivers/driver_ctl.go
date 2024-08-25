@@ -3,6 +3,7 @@ package drivers
 import (
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/brokenCursor/usb-modem-cli/logging"
 	"github.com/spf13/viper"
@@ -27,12 +28,13 @@ type (
 		BaseModem
 
 		SendSMS(phone string, message string) error
-		// GetAllSMS() ([]SMS, error)
+		ReadAllSMS() ([]SMS, error)
 	}
 )
 
 type (
 	SMS struct {
+		Time    time.Time
 		Sender  string
 		Message string
 	}
@@ -53,7 +55,6 @@ func init() {
 }
 
 func IsRegistered(name string) bool {
-	// Check if driver has already been registered
 	_, ok := Drivers[name]
 	return ok
 }

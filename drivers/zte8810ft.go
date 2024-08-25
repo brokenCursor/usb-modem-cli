@@ -1,6 +1,7 @@
 package drivers
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,6 +15,7 @@ import (
 	cfg "github.com/brokenCursor/usb-modem-cli/config"
 	"github.com/spf13/viper"
 	"github.com/warthog618/sms/encoding/gsm7"
+	"github.com/warthog618/sms/encoding/ucs2"
 )
 
 // DO NOT USE DIRECTLY
@@ -30,6 +32,17 @@ type (
 
 	pppConnected struct {
 		Connected string `json:"ppp_status"`
+	}
+
+	rawIncomingSMS struct {
+		Messages []struct {
+			ID           string `json:"id"`
+			Source       string `json:"number"`
+			Content      string `json:"content"`
+			Tag          string `json:"tag"`
+			Date         string `json:"date"`
+			DraftGroupID string `json:"draft_group_id"`
+		} `json:"messages"`
 	}
 )
 
@@ -227,14 +240,8 @@ func (m *zte8810ft) GetCellConnStatus() (*LinkStatus, error) {
 }
 
 func (m *zte8810ft) SendSMS(phone string, message string) error {
-	// GET /goform/goform_set_cmd_process?goformId=SEND_SMS
-	// Prepare everything to make a request
-
 	// Encode message into GSM-7 as byte array
 	encodedMsg, err := gsm7.Encode([]byte(message))
-	switch err {
-
-	}
 	if err != nil {
 		return ActionError{Action: "sms send", Err: err}
 	}
@@ -303,4 +310,80 @@ func (m *zte8810ft) SendSMS(phone string, message string) error {
 	}
 
 	return nil
+}
+
+func (m *zte8810ft) ReadAllSMS() ([]SMS, error) {
+	// http://10.96.170.1/goform/goform_get_cmd_process?cmd=sms_data_total&page=0&data_per_page=100&mem_store=1&tags=12&order_by=order+by+id+desc&_=1724578532798
+	// Build query
+	u := m.getBaseURL("/goform/goform_get_cmd_process")
+	query := u.Query()
+	query.Add("cmd", "sms_data_total")
+	query.Add("page", "0")
+	query.Add("data_per_page", "100")
+	query.Add("mem_store", "1")
+	query.Add("tags", "12") // 1 - Received, unread | 2 - Sent | 12 - Received, read + unread | 11 - Drafts (??)
+	query.Add("order_by", "order by id desc")
+	query.Add("_", strconv.FormatInt((time.Now().UnixMilli)(), 10))
+	u.RawQuery = query.Encode()
+
+	request, err := m.getNewRequest("GET", u, http.Header{}, nil)
+	if err != nil {
+		return nil, ActionError{Action: "sms read", Err: err}
+	}
+	m.logger.With("request", request.URL.String()).Debug("request")
+
+	resp, err := m.httpClient.Do(request)
+
+	// Process errors
+	switch {
+	case err != nil:
+		return nil, ActionError{Action: "status", Err: err}
+	case resp.StatusCode != 200:
+		return nil, ActionError{Action: "status", Err: fmt.Errorf("response status %d", resp.StatusCode)}
+	}
+
+	// Read the response
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, ErrUnknown
+	}
+
+	rawSMS := new(rawIncomingSMS)
+
+	err = json.Unmarshal(body, &rawSMS)
+	if err != nil {
+		m.logger.With("body", body).Debug("failed to unmarshal body to struct")
+		return nil, ActionError{Action: "sms read", Err: err}
+	}
+
+	processedSMS := make([]SMS, len(rawSMS.Messages))
+	for i := range rawSMS.Messages {
+		processedSMS[i].Sender = rawSMS.Messages[i].Source
+
+		// Extract datetime
+		date, err := time.Parse("06,01,02,15,04,05,-07", rawSMS.Messages[i].Date)
+		if err != nil {
+			m.logger.With("id", rawSMS.Messages[i].ID, "raw_date", rawSMS.Messages[i].Date, "err", err).Debug("failed to parse datetime")
+			return nil, ActionError{Action: "sms read", Err: fmt.Errorf("failed to decode message datetime")}
+		}
+		processedSMS[i].Time = date
+
+		// Extract contents
+		rawBytes, err := hex.DecodeString(rawSMS.Messages[i].Content)
+		if err != nil {
+			m.logger.With("id", rawSMS.Messages[i].ID, "raw_content", rawSMS.Messages[i].Content).Debug("failed to parse content")
+			return nil, ActionError{Action: "sms read", Err: fmt.Errorf("failed to parse message content")}
+		}
+
+		runes, err := ucs2.Decode(rawBytes)
+		if err != nil {
+			m.logger.With("id", rawSMS.Messages[i].ID, "raw_content", rawSMS.Messages[i].Content).Debug("failed to decode content")
+			return nil, ActionError{Action: "sms read", Err: fmt.Errorf("failed to decode message content")}
+		}
+
+		processedSMS[i].Message = string(runes)
+	}
+
+	return processedSMS, nil
 }

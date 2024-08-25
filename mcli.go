@@ -3,6 +3,7 @@ package main
 import (
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/alexflint/go-arg"
 	"github.com/brokenCursor/usb-modem-cli/config"
@@ -98,7 +99,6 @@ func run() error {
 			}
 		}
 	case args.SMS != nil:
-		// None of this is implemented :)
 		sms, ok := modem.(drivers.ModemSMS)
 		if !ok {
 			return DriverSupportError{Driver: modem, Function: "SMS"}
@@ -108,12 +108,21 @@ func run() error {
 		case args.SMS.Send != nil:
 			err := validate.Struct(args.SMS.Send)
 			if err != nil {
-				parser.FailSubcommand("Unknown action", "sms")
+				parser.FailSubcommand("Unknown values or action", "sms")
 			}
 
 			err = sms.SendSMS(args.SMS.Send.PhoneNumber, args.SMS.Send.Message)
 			if err != nil {
 				return err
+			}
+		case args.SMS.Read != nil:
+			messages, err := sms.ReadAllSMS()
+			if err != nil {
+				return err
+			}
+
+			for i := range messages {
+				cfmt.Printf("{{ID:}}::cyan %d\n{{Source:}}::green %s\n{{Time:}}::yellow %s\n{{Text:}}::#FA8100\n%s\n---\n", i, messages[i].Sender, messages[i].Time.Format(time.DateTime), messages[i].Message)
 			}
 		}
 	case parser.Subcommand() == nil:

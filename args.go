@@ -9,7 +9,7 @@ type (
 
 	SMSSendArgs struct {
 		PhoneNumber string `validate:"e164" arg:"-p,--phone,required" help:"Receiver's phone number"`
-		Message     string `validate:"printascii" arg:"-m,--msg,required" help:"Message to be sent"`
+		Message     string `validate:"alphanum" arg:"-m,--msg,required" help:"Message to be sent"`
 	}
 
 	SMSReadArgs struct {
