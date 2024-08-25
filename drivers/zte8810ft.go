@@ -67,15 +67,16 @@ func (m *zte8810ft) getBaseURL(path string) *url.URL {
 	return &url.URL{Scheme: "http", Host: m.config.GetString("host"), Path: path}
 }
 
-func (m *zte8810ft) getNewRequest(method string, url *url.URL, headers http.Header) *http.Request {
+func (m *zte8810ft) getNewRequest(method string, url *url.URL, headers http.Header, body io.Reader) (req *http.Request, err error) {
 	headers.Add("Referer", fmt.Sprintf("http://%s/index.html", m.config.GetString("host")))
 
-	return &http.Request{
-		Proto:  "HTTP/1.1",
-		Method: method,
-		URL:    url,
-		Header: headers,
+	req, err = http.NewRequest(method, url.String(), body)
+	if err != nil {
+		return nil, err
 	}
+
+	req.Header = headers
+	return
 }
 
 func (m *zte8810ft) GetModel() string {
@@ -88,8 +89,12 @@ func (m *zte8810ft) ConnectCell() error {
 	query := u.Query()
 	query.Add("goformId", "CONNECT_NETWORK")
 	u.RawQuery = query.Encode()
-	request := m.getNewRequest("GET", u, http.Header{})
 
+	// Create request
+	request, err := m.getNewRequest("GET", u, http.Header{}, strings.NewReader(""))
+	if err != nil {
+		return ActionError{Action: "connect", Err: err}
+	}
 	m.logger.Debug("request", request.URL.String(), nil)
 
 	resp, err := m.httpClient.Do(request)
@@ -128,7 +133,12 @@ func (m *zte8810ft) DisconnectCell() error {
 	query := u.Query()
 	query.Add("goformId", "DISCONNECT_NETWORK")
 	u.RawQuery = query.Encode()
-	request := m.getNewRequest("GET", u, http.Header{})
+
+	// Create request
+	request, err := m.getNewRequest("GET", u, http.Header{}, strings.NewReader(""))
+	if err != nil {
+		return ActionError{Action: "disconnect", Err: err}
+	}
 
 	m.logger.Debug("request", request.URL.String(), nil)
 
@@ -172,8 +182,10 @@ func (m *zte8810ft) GetCellConnStatus() (*LinkStatus, error) {
 	query.Add("_", strconv.FormatInt((time.Now().UnixMilli)(), 10))
 	u.RawQuery = query.Encode()
 
-	request := m.getNewRequest("GET", u, http.Header{})
-
+	request, err := m.getNewRequest("GET", u, http.Header{}, strings.NewReader(""))
+	if err != nil {
+		return nil, ActionError{Action: "status", Err: err}
+	}
 	m.logger.Debug("request", request.URL.String(), nil)
 
 	resp, err := m.httpClient.Do(request)
@@ -250,18 +262,20 @@ func (m *zte8810ft) SendSMS(phone string, message string) error {
 		query.Add("sms_time", t.Format("06;01;02;15;04;05;")+strconv.Itoa(tz/3600))
 	}
 
-	request := m.getNewRequest("POST", u, http.Header{
-		"Content-Type": {"application/x-www-form-urlencoded", "charset=UTF-8"}})
-
 	// Some Go-level string manipulation
 	encoded := query.Encode()
 	stringReader := strings.NewReader(encoded)
-	stringReadCloser := io.NopCloser(stringReader)
-	request.Body = stringReadCloser
 
+	// Create request
+	request, err := m.getNewRequest("POST", u, http.Header{
+		"Content-Type": {"application/x-www-form-urlencoded; charset=UTF-8"}}, stringReader)
+	if err != nil {
+		return ActionError{Action: "sms send", Err: err}
+	}
 	m.logger.Debug("url", request.URL.String(), "body", encoded, nil)
 
 	resp, err := m.httpClient.Do(request)
+	request.Close = true
 
 	// Process errors
 	switch {
