@@ -108,6 +108,7 @@ func run() error {
 		case args.SMS.Send != nil:
 			err := validate.Struct(args.SMS.Send)
 			if err != nil {
+				logger.With("err", err.Error()).Debug("sms send validation error")
 				parser.FailSubcommand("Unknown values or action", "sms")
 			}
 
