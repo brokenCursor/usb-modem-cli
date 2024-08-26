@@ -47,14 +47,13 @@ type (
 )
 
 func init() {
-	fmt.Println("here")
 	RegisterDriver("ZTE 8810FT", newZTE8810FT)
 }
 
 func newZTE8810FT(config *viper.Viper, logger *slog.Logger) (BaseModem, error) {
 	if config.IsSet("iface") {
 		ifaceName := config.GetString("iface")
-		logger.With("iface_name", ifaceName).Debug("interface has been specified")
+		logger.With("iface_name", ifaceName).Debug("NIC has been specified")
 
 		// Get this computer's IP on the interface
 		ifaceAddr, err := GetInterfaceIPv4Addr(ifaceName)

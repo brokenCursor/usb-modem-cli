@@ -41,13 +41,13 @@ type (
 
 	// Link statuses
 	LinkStatus struct {
-		State int8
+		State int8 // 0 - down 1 - disconnecting 2 - connecting 3 - up
 	}
 )
 
 var (
-	Drivers map[string]func(config *viper.Viper, logger *slog.Logger) (BaseModem, error) = map[string]func(config *viper.Viper, logger *slog.Logger) (BaseModem, error){}
-	logger  *slog.Logger
+	driverStore map[string]func(config *viper.Viper, logger *slog.Logger) (BaseModem, error) = map[string]func(config *viper.Viper, logger *slog.Logger) (BaseModem, error){}
+	logger      *slog.Logger
 )
 
 func init() {
@@ -55,7 +55,7 @@ func init() {
 }
 
 func IsRegistered(name string) bool {
-	_, ok := Drivers[name]
+	_, ok := driverStore[name]
 	return ok
 }
 
@@ -66,27 +66,27 @@ func RegisterDriver(name string, generator func(config *viper.Viper, logger *slo
 	}
 
 	// Register the driver
-	Drivers[name] = generator
+	driverStore[name] = generator
 	logger.With("name", name).Debug("driver registered")
 }
 
-func GetModemDriver(model string, config *viper.Viper, logger *slog.Logger) (BaseModem, error) {
-	if !IsRegistered(model) {
+func GetModemDriver(name string, config *viper.Viper, logger *slog.Logger) (BaseModem, error) {
+	if !IsRegistered(name) {
 		return nil, ErrUnknownModel
 	}
 
-	logger.Debug("driver instance created", "driver", model)
-	return Drivers[model](config, logger)
+	logger.Debug("driver instance created", "driver", name)
+	return driverStore[name](config, logger)
 }
 
-func GetAvailableDrivers() *[]string {
-	keys := make([]string, len(Drivers))
+func GetAvailableDrivers() []string {
+	keys := make([]string, len(driverStore))
 
 	i := 0
-	for k := range Drivers {
+	for k := range driverStore {
 		keys[i] = k
 		i++
 	}
 
-	return &keys
+	return keys
 }

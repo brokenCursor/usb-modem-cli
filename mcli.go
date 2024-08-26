@@ -88,14 +88,14 @@ func run() error {
 
 			// Process and output status
 			switch status.State {
-			case 3:
-				cfmt.Println("Status: {{up}}::green|bold")
 			case 0:
 				cfmt.Println("Status: {{down}}::red|bold")
-			case 2:
-				cfmt.Println("Status: {{connecting}}::yellow|bold")
 			case 1:
 				cfmt.Println("Status: {{disconnecting}}::#FA8100|bold")
+			case 2:
+				cfmt.Println("Status: {{connecting}}::yellow|bold")
+			case 3:
+				cfmt.Println("Status: {{up}}::green|bold")
 			}
 		}
 	case args.SMS != nil:

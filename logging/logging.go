@@ -21,7 +21,6 @@ func init() {
 		slog.Error("logging.general: ", err.Error(), nil)
 	}
 
-	// Setup levels
 	driverLevel, err := strToLevel(logConfig.GetString("driver"))
 	if err != nil {
 		slog.Error("logging.driver: ", err.Error(), nil)

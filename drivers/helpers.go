@@ -20,12 +20,11 @@ func GetInterfaceIPv4Addr(iface string) (addr net.IP, err error) {
 		return
 	}
 
-	// Get all of the addresses on the interface
+	// Find the first IPv4 address on the NIC
 	if addrs, err = ief.Addrs(); err != nil {
 		return
 	}
 
-	// Find the first IPv4 address
 	for _, addr := range addrs {
 		if ipv4Addr = addr.(*net.IPNet).IP.To4(); ipv4Addr != nil {
 			break
