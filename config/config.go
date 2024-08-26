@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"runtime"
 
 	"github.com/spf13/viper"
 )
@@ -21,7 +22,11 @@ func init() {
 	config.SetConfigName("config")
 	config.SetConfigType("yaml")
 
+	// TODO: proper global config path setup
 	sep := string(os.PathSeparator)
+	if runtime.GOOS == "linux" {
+		config.AddConfigPath("/etc/mcli")
+	}
 	config.AddConfigPath(dir + sep + "modem-cli")
 
 	// -- Defaults -- //
